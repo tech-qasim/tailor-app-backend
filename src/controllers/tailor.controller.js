@@ -1,7 +1,8 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
-import { Tailor } from "../models/tailor.model.js"; // Assuming this is your tailor model
+import { Tailor } from "../models/tailor.model.js";
+import { uploadOnCloudinary } from "../utils/cloudinary.js";
 
 const registerTailor = asyncHandler(async (req, res) => {
   const {
@@ -35,6 +36,17 @@ const registerTailor = asyncHandler(async (req, res) => {
     throw new ApiError(409, "Tailor with phone number or email already exists");
   }
 
+  const avatarLocalPath = req.file?.path;
+
+  const avatar = (await avatarLocalPath)
+    ? await uploadOnCloudinary(avatarLocalPath)
+    : null;
+
+  if (!avatar) {
+    console.log(avatarLocalPath);
+    // throw new ApiError(400, "Failed to upload avatar");
+  }
+
   const tailor = await Tailor.create({
     tailorName,
     tailorEmail,
@@ -43,6 +55,7 @@ const registerTailor = asyncHandler(async (req, res) => {
     shopID,
     shopName,
     password,
+    avatar: avatar?.url || "",
   });
 
   const createdTailor = await Tailor.findById(tailor._id).select("-password");

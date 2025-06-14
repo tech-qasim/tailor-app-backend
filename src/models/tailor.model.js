@@ -35,7 +35,9 @@ const tailorSchema = new Schema(
     shopName: {
       type: String,
     },
-
+    avatar: {
+        type: String
+    }, 
     password: {
       type: String,
       required: [true, "Password is required"],

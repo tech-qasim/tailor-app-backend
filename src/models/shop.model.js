@@ -17,6 +17,9 @@ const shopSchema = new Schema(
       lowercase: true,
       trim: true,
     },
+    avatar: {
+      type: String,
+    },
     shopAddress: {
       type: String,
       required: true,

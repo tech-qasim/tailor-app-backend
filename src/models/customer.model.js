@@ -15,6 +15,9 @@ const customerSchema = new Schema(
       type: String,
       required: true,
     },
+    avatar: {
+      type: String,
+    },
     shopID: {
       type: Schema.Types.ObjectId,
       ref: "Shop",

@@ -2,6 +2,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { Shop } from "../models/shop.model.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
+import { uploadOnCloudinary } from "../utils/cloudinary.js";
 
 const registerShop = asyncHandler(async (req, res) => {
   const { shopName, shopAddress, shopPhoneNo, shopEmail, password } = req.body;
@@ -25,33 +26,25 @@ const registerShop = asyncHandler(async (req, res) => {
     );
   }
 
-  //   const avatarLocalPath = req.files?.avatar[0]?.path;
-  //   // const coverImageLocalPath = req.files?.coverImage[0]?.path;
+  // const avatarLocalPath = req.files?.avatar[0]?.path;
+  // const coverImageLocalPath = req.files?.coverImage[0]?.path;
 
-  //   let coverImageLocalPath;
-  //   if (
-  //     req.files &&
-  //     Array.isArray(req.files.coverImage) &&
-  //     req.files.coverImage.length > 0
-  //   ) {
-  //     coverImageLocalPath = req.files.coverImage[0].path;
-  //   }
+  const avatarLocalPath = req.file?.path;
 
-  //   console.log(res.files);
+  console.log(res.files);
 
-  //   if (!avatarLocalPath) {
-  //     throw new ApiError(400, "Avatar is required");
-  //   }
+  // if (!avatarLocalPath) {
+  //   throw new ApiError(400, "Avatar is required");
+  // }
 
-  //   const avatar = await uploadOnCloudinary(avatarLocalPath);
-  //   const coverImage = coverImageLocalPath
-  //     ? await uploadOnCloudinary(coverImageLocalPath)
-  //     : null;
+  const avatar = (await avatarLocalPath)
+    ? await uploadOnCloudinary(avatarLocalPath)
+    : null;
 
-  //   if (!avatar) {
-  //     console.log(avatarLocalPath);
-  //     throw new ApiError(400, "Failed to upload avatar");
-  //   }
+  if (!avatar) {
+    console.log(avatarLocalPath);
+    // throw new ApiError(400, "Failed to upload avatar");
+  }
 
   const shop = await Shop.create({
     shopName: shopName,
@@ -59,6 +52,7 @@ const registerShop = asyncHandler(async (req, res) => {
     shopAddress: shopAddress,
     shopPhoneNo: shopPhoneNo,
     password: password,
+    avatar: avatar?.url || "",
   });
 
   const createdShop = await Shop.findById(shop._id).select(
