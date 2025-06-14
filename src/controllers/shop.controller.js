@@ -74,4 +74,89 @@ const registerShop = asyncHandler(async (req, res) => {
     .json(new ApiResponse(201, createdShop, "Shop registered successfully"));
 });
 
-export { registerShop };
+const generateAccessTokenAndRefreshTokens = async (shopID) => {
+  try {
+    const shop = await Shop.findById(shopID);
+    const accessToken = shop.generateAccessToken();
+    const refreshToken = shop.generateRefreshToken();
+
+    shop.refreshToken = refreshToken;
+    await shop.save({ validateBeforeSave: false });
+
+    return { accessToken, refreshToken };
+  } catch (e) {
+    throw new ApiError(
+      500,
+      "Something went wrong while generating refresh and access token",
+      e
+    );
+  }
+};
+
+const getCurrentShop = asyncHandler(async (req, res) => {
+  return res
+    .status(200)
+    .json(new ApiResponse(200, req.user, "User fetched successfully"));
+});
+
+const loginShop = asyncHandler(async (req, res) => {
+  //req body -> data
+  // username or email
+  // find the user
+  // password check
+  //access and refresh token
+  //send cookie
+
+  const { shopEmail, shopPhoneNumber, password } = req.body;
+
+  if (!shopEmail && !shopPhoneNumber) {
+    throw new ApiError(400, "shop email or phone number is required");
+  }
+
+  const shop = await Shop.findOne({
+    $or: [{ shopEmail }, { shopPhoneNumber }],
+  });
+
+  if (!shop) {
+    throw new ApiError(404, "Shop does not exist");
+  }
+
+  const isPasswordCorrect = await shop.isPasswordCorrect(password);
+
+  if (!isPasswordCorrect) {
+    throw new ApiError(401, "Invalid user credentials");
+  }
+
+  const { accessToken, refreshToken } =
+    await generateAccessTokenAndRefreshTokens(shop._id);
+
+  const loggedInUser = await Shop.findById(shop._id).select(
+    "-password -refreshToken"
+  );
+  const options = {
+    httpOnly: true,
+    secure: true,
+  };
+  return res
+    .status(200)
+    .cookie("accessToken", accessToken, options)
+    .cookie("refreshToken", refreshToken, options)
+    .json(
+      new ApiResponse(
+        200,
+        {
+          user: loggedInUser,
+          accessToken,
+          refreshToken,
+        },
+        "Shop logged In Successfully"
+      )
+    );
+});
+
+export {
+  registerShop,
+  generateAccessTokenAndRefreshTokens,
+  loginShop,
+  getCurrentShop,
+};
