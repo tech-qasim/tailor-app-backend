@@ -86,4 +86,4 @@ tailorSchema.methods.generateRefreshToken = function () {
   );
 };
 
-export const Shop = mongoose.model("Tailor", tailorSchema);
+export const Tailor = mongoose.model("Tailor", tailorSchema);

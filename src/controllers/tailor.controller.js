@@ -1,7 +1,7 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
-import { Shop } from "../models/tailor.model.js"; // Assuming this is your tailor model
+import { Tailor } from "../models/tailor.model.js"; // Assuming this is your tailor model
 
 const registerTailor = asyncHandler(async (req, res) => {
   const {
@@ -27,7 +27,7 @@ const registerTailor = asyncHandler(async (req, res) => {
     throw new ApiError(400, "All fields are required");
   }
 
-  const existingTailor = await Shop.findOne({
+  const existingTailor = await Tailor.findOne({
     $or: [{ tailorEmail }, { tailorPhoneNumber }],
   });
 
@@ -35,7 +35,7 @@ const registerTailor = asyncHandler(async (req, res) => {
     throw new ApiError(409, "Tailor with phone number or email already exists");
   }
 
-  const tailor = await Shop.create({
+  const tailor = await Tailor.create({
     tailorName,
     tailorEmail,
     tailorPhoneNumber,
@@ -45,7 +45,7 @@ const registerTailor = asyncHandler(async (req, res) => {
     password,
   });
 
-  const createdTailor = await Shop.findById(tailor._id).select("-password");
+  const createdTailor = await Tailor.findById(tailor._id).select("-password");
 
   if (!createdTailor) {
     throw new ApiError(
@@ -62,7 +62,7 @@ const registerTailor = asyncHandler(async (req, res) => {
 });
 
 const getTailors = asyncHandler(async (req, res) => {
-  const tailors = await Shop.find().select("-password");
+  const tailors = await Tailor.find().select("-password");
 
   if (!tailors || tailors.length === 0) {
     throw new ApiError(404, "No tailors found");
@@ -76,7 +76,7 @@ const getTailors = asyncHandler(async (req, res) => {
 const getTailorById = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  const tailor = await Shop.findById(id).select("-password");
+  const tailor = await Tailor.findById(id).select("-password");
 
   if (!tailor) {
     throw new ApiError(404, "Tailor not found");
@@ -87,4 +87,117 @@ const getTailorById = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, tailor, "Tailor fetched successfully"));
 });
 
-export { registerTailor, getTailors, getTailorById };
+const loginTailor = asyncHandler(async (req, res) => {
+  //req body -> data
+  // username or email
+  // find the user
+  // password check
+  //access and refresh token
+  //send cookie
+
+  const { tailorEmail, tailorPhoneNumber, password } = req.body;
+
+  if (!tailorEmail && !tailorPhoneNumber) {
+    throw new ApiError(400, "shop email or phone number is required");
+  }
+
+  const tailor = await Tailor.findOne({
+    $or: [{ tailorEmail }, { tailorPhoneNumber }],
+  });
+
+  if (!tailor) {
+    throw new ApiError(404, "Shop does not exist");
+  }
+
+  const isPasswordCorrect = await tailor.isPasswordCorrect(password);
+
+  if (!isPasswordCorrect) {
+    throw new ApiError(401, "Invalid user credentials");
+  }
+
+  const { accessToken, refreshToken } =
+    await generateAccessTokenAndRefreshTokens(tailor._id);
+
+  const loggedInUser = await Tailor.findById(tailor._id).select(
+    "-password -refreshToken"
+  );
+  const options = {
+    httpOnly: true,
+    secure: true,
+  };
+  return res
+    .status(200)
+    .cookie("accessToken", accessToken, options)
+    .cookie("refreshToken", refreshToken, options)
+    .json(
+      new ApiResponse(
+        200,
+        {
+          user: loggedInUser,
+          accessToken,
+          refreshToken,
+        },
+        "Shop logged In Successfully"
+      )
+    );
+});
+
+const generateAccessTokenAndRefreshTokens = async (shopID) => {
+  try {
+    const tailor = await Tailor.findById(shopID);
+    const accessToken = tailor.generateAccessToken();
+    const refreshToken = tailor.generateRefreshToken();
+
+    tailor.refreshToken = refreshToken;
+    await tailor.save({ validateBeforeSave: false });
+
+    return { accessToken, refreshToken };
+  } catch (e) {
+    throw new ApiError(
+      500,
+      "Something went wrong while generating refresh and access token",
+      e
+    );
+  }
+};
+
+const getCurrentTailor = asyncHandler(async (req, res) => {
+  return res
+    .status(200)
+    .json(new ApiResponse(200, req.user, "User fetched successfully"));
+});
+
+const logOutTailor = asyncHandler(async (req, res) => {
+  await Tailor.findOneAndUpdate(
+    req.user._id,
+    {
+      $set: {
+        refreshToken: undefined,
+      },
+    },
+    {
+      new: true,
+    }
+  );
+
+  const options = {
+    httpOnly: true,
+    secure: true,
+  };
+
+  return res
+    .status(200)
+    .clearCookie("accessToken", options)
+    .clearCookie("refreshToken", options)
+    .json(new ApiResponse(200, null, "User logged out successfully"));
+});
+
+export {
+  registerTailor,
+  getTailors,
+  getTailorById,
+  loginTailor,
+  generateAccessTokenAndRefreshTokens,
+  logOutTailor,
+  getCurrentTailor,
+};
